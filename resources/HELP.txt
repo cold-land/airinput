@@ -1,0 +1,21 @@
+AirInput - 实时文本同步工具
+=============================
+
+描述：
+  AirInput 是一个实时文本同步工具，支持从移动设备到 PC 的文本传输，
+  并提供多用户支持功能。
+
+用法：
+  airinput [选项]
+
+选项：
+  --version    显示版本信息并退出
+  --help       显示此帮助信息并退出
+
+示例：
+  airinput --version
+  airinput --help
+
+更多信息：
+  项目主页：https://github.com/cold-land/airinput
+  许可证：GPL-3.0-or-later

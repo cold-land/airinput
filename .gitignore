@@ -1,6 +1,7 @@
 # Nim 编译产物
 nimcache/
 nimble.develop/
+airinput
 
 # 编译输出的二进制文件
 *.exe
@@ -16,3 +17,8 @@ Thumbs.db
 
 #AI 用
 AGENTS.md
+
+#文档
+nim_docs/
+NOTES.md
+
