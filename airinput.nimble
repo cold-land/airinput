@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.0.0.2"
+version       = "0.0.0.3"
 author        = "Shaowei"
 description   = "Real-time text sync tool for mobile-to-PC with multi-user support."
 license       = "GPL-3.0-or-later"

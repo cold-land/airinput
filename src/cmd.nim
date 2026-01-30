@@ -1,4 +1,4 @@
-import parseopt
+import std/parseopt
 
 # 处理命令行参数
 proc handleCmdLine*() =
