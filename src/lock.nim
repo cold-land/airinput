@@ -19,6 +19,30 @@ var lockFd: cint = -1
 proc getLockFilePath(): string =
   getTempDir() / LOCK_FILE
 
+# 守护进程化
+proc daemonize*(): bool =
+  # 第一次 fork
+  if fork() != 0:
+    quit(0)
+  
+  # 创建新会话
+  if setsid() < 0:
+    return false
+  
+  # 第二次 fork
+  if fork() != 0:
+    quit(0)
+  
+  # 重定向标准输入/输出/错误
+  let nullFile = open("/dev/null", O_RDWR)
+  if nullFile >= 0:
+    discard dup2(nullFile, STDIN_FILENO)
+    discard dup2(nullFile, STDOUT_FILENO)
+    discard dup2(nullFile, STDERR_FILENO)
+    discard close(nullFile)
+  
+  return true
+
 # 检查进程是否存活
 proc isProcessAlive(pid: Pid): bool =
   if pid <= 0:

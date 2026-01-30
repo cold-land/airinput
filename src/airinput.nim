@@ -10,8 +10,14 @@ when isMainModule:
   # 处理命令行参数
   let cmdResult = handleCmdLine()
   
+  # 如果是守护进程模式，先守护进程化
+  if cmdResult.daemonMode:
+    if not daemonize():
+      echo "守护进程化失败"
+      quit(1)
+  
   # 初始化日志
-  initLogger(cmdResult.debugMode)
+  initLogger(cmdResult.debugMode, cmdResult.daemonMode)
   
   # 主逻辑
   logging.info("程序已启动")
