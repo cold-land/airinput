@@ -15,6 +15,9 @@ const LOCK_FILE = "airinput.lock"
 # 全局变量保存文件描述符
 var lockFd: cint = -1
 
+# 退出标志
+var shouldExit = false
+
 # 获取跨平台锁文件路径
 proc getLockFilePath(): string =
   getTempDir() / LOCK_FILE
@@ -91,33 +94,53 @@ proc getLockHolderPid(): Pid =
       # /proc/locks 格式示例：
       # 1: POSIX  ADVISORY  READ  pid:12345  08:02:123456 0 EOF
       # 2: flock  ADVISORY  WRITE pid:12345  08:02:123456 0 EOF
-      if "flock" in line and "ADVISORY" in line:
+      # 3: FLOCK  ADVISORY  WRITE 12345  00:2b:66730 0 EOF
+      if "flock" in line.toLowerAscii() and "ADVISORY" in line:
         let parts = line.splitWhitespace()
         if parts.len >= 5:
-          # 查找 pid:xxxxx 部分
+          # 查找 pid:xxxxx 部分 或直接的 PID
+          var pidStr = ""
           for part in parts:
             if part.startsWith("pid:"):
-              let pidStr = part[4..^1]
-              let pid = parseInt(pidStr)
-              
-              # 验证这个进程是否确实持有我们的锁文件
-              # 检查 /proc/PID/fd 中的文件描述符
-              let fdDir = "/proc/" & $pid & "/fd"
-              if dirExists(fdDir):
-                for fdFile in walkDir(fdDir):
-                  var fdStat: Stat
-                  if stat(fdFile.path, fdStat) == 0:
-                    if fdStat.st_ino == lockInode:
-                      return pid.Pid
+              pidStr = part[4..^1]
+              break
+          
+          # 如果没有找到 pid: 格式，尝试直接解析 PID
+          if pidStr == "":
+            # 在 /proc/locks 中，PID 通常在第五个位置
+            # 格式: 162: FLOCK  ADVISORY  WRITE 907323 00:2b:66730 0 EOF
+            # parts = ["162:", "FLOCK", "ADVISORY", "WRITE", "907323", "00:2b:66730", "0", "EOF"]
+            if parts.len >= 5:
+              let possiblePid = parts[4]
+              try:
+                let _ = parseInt(possiblePid)
+                pidStr = possiblePid
+              except:
+                discard
+          
+          if pidStr != "":
+            let pid = parseInt(pidStr)
+            
+            # 验证这个进程是否确实持有我们的锁文件
+            # 检查 /proc/PID/fd 中的文件描述符
+            let fdDir = "/proc/" & $pid & "/fd"
+            if dirExists(fdDir):
+              for fdFile in walkDir(fdDir):
+                var fdStat: Stat
+                if stat(fdFile.path, fdStat) == 0:
+                  if fdStat.st_ino == lockInode:
+                    return pid.Pid
     return 0
   except:
     return 0
 
 # 清理锁
 proc cleanupLock() {.noconv.} =
+  shouldExit = true
   if lockFd >= 0:
     discard close(lockFd)
     lockFd = -1
+  quit(0)
 
 # 确保单实例运行
 proc ensureSingleInstance*(): bool =
@@ -153,6 +176,12 @@ proc ensureSingleInstance*(): bool =
         echo "正在终止旧实例 (PID: " & $oldPid & ")..."
         if killProcess(oldPid, graceful = true):
           echo "旧实例已终止"
+          # 等待锁文件被释放
+          for i in 0..<10:
+            sleep(200)
+            let currentPid = getLockHolderPid()
+            if currentPid == 0:
+              break
           # 关闭当前文件描述符，重新打开
           discard close(lockFd)
           lockFd = open(lockFile, O_RDWR or O_CREAT, 0o600)

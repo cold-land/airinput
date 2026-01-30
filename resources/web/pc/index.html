@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>AirInput PC Client</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    h1 { color: #333; }
+    .status {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+    }
+    .connected { background-color: #d4edda; color: #155724; }
+    .disconnected { background-color: #f8d7da; color: #721c24; }
+    .messages {
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin: 10px 0;
+      height: 300px;
+      overflow-y: auto;
+    }
+    .message { margin: 5px 0; padding: 5px; border-left: 3px solid #007bff; }
+  </style>
+</head>
+<body>
+  <h1>AirInput PC 客户端</h1>
+  <div id="status" class="status disconnected">未连接</div>
+  
+  <div class="messages" id="messages"></div>
+  
+  <script>
+    var ws = null;
+    var statusDiv = document.getElementById('status');
+    var messagesDiv = document.getElementById('messages');
+    
+    function connect() {
+      ws = new WebSocket('ws://localhost:5001/ws');
+      
+      ws.onopen = function() {
+        statusDiv.className = 'status connected';
+        statusDiv.textContent = '已连接到服务器';
+        addMessage('系统', 'WebSocket 连接已建立');
+      };
+      
+      ws.onmessage = function(event) {
+        addMessage('收到', event.data);
+      };
+      
+      ws.onclose = function() {
+        statusDiv.className = 'status disconnected';
+        statusDiv.textContent = '连接已断开';
+        addMessage('系统', 'WebSocket 连接已关闭');
+        
+        // 5秒后尝试重连
+        setTimeout(connect, 5000);
+      };
+      
+      ws.onerror = function() {
+        statusDiv.className = 'status disconnected';
+        statusDiv.textContent = '连接错误';
+        addMessage('错误', 'WebSocket 连接错误');
+      };
+    }
+    
+    function addMessage(type, content) {
+      var time = new Date().toLocaleTimeString();
+      var div = document.createElement('div');
+      div.className = 'message';
+      div.textContent = '[' + time + '] [' + type + '] ' + content;
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    // 启动连接
+    connect();
+  </script>
+</body>
+</html>
