@@ -2,6 +2,7 @@
 nimcache/
 nimble.develop/
 airinput
+.airinput.pid
 
 # 编译输出的二进制文件
 *.exe

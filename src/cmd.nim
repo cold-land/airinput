@@ -1,7 +1,7 @@
 import std/parseopt
 
 # 处理命令行参数
-proc handleCmdLine*() =
+proc handleCmdLine*(): tuple[debugMode: bool] =
   # 使用 staticRead 在编译时读取帮助文件
   const helpText = staticRead("../resources/HELP.txt")
   
@@ -11,6 +11,7 @@ proc handleCmdLine*() =
   var
     showVersion = false
     showHelp = false
+    debugMode = false
   
   for kind, key, val in getopt():
     case kind
@@ -20,6 +21,8 @@ proc handleCmdLine*() =
         showVersion = true
       elif key == "help":
         showHelp = true
+      elif key == "debug":
+        debugMode = true
     of cmdShortOption, cmdArgument:
       discard
   
@@ -30,3 +33,5 @@ proc handleCmdLine*() =
   if showHelp:
     echo helpText
     quit(0)
+  
+  return (debugMode: debugMode)
