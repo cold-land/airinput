@@ -1,0 +1,20 @@
+========================================
+cmd.nim - 函数列表
+========================================
+
+CmdResult*(debugMode: bool, daemonMode: bool, configFile: string, generateConfig: string, checkConfig: bool, showConfig: bool, listInterfaces: bool)
+作用：命令行参数结果对象，包含所有命令行选项
+
+handleCmdLine*(): CmdResult
+作用：处理命令行参数，支持版本、帮助、调试、守护进程、配置文件等选项
+- 支持 --version 显示版本号
+- 支持 --help 显示帮助信息
+- 支持 --debug 启用调试模式
+- 支持 -D 启动守护进程模式
+- 支持 --config-file <path> 指定配置文件
+- 支持 --generate-config [path] 生成默认配置文件
+- 支持 --check-config 检查配置文件
+- 支持 --show-config 显示当前配置
+- 支持 --list-interfaces 列出所有网络接口
+- 版本号从 NimblePkgVersion 编译时常量获取
+- 帮助文本从 resources/HELP.txt 静态读取

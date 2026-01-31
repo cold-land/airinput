@@ -1,0 +1,12 @@
+========================================
+logger.nim - 函数列表
+========================================
+
+getLogDir(): string
+作用：获取跨平台日志目录路径
+
+initLogger*(debugMode: bool = false, daemonMode: bool = false, loggingConfig: LoggingConfig = nil)
+作用：初始化日志系统，支持配置文件驱动
+
+logFlow*(level: string, source: string, target: string, content: string)
+作用：记录信息流向日志，格式：[时间:级别][来源]→[目标]内容

@@ -1,0 +1,54 @@
+========================================
+server.nim - 函数列表
+========================================
+
+readHtmlFile(filename: string): string
+作用：读取HTML文件内容，出错时返回错误页面
+
+mobileHandler(request: Request)
+作用：处理移动端页面的HTTP请求
+
+pcHandler(request: Request)
+作用：处理PC端页面的HTTP请求
+
+upgradeHandler(request: Request)
+作用：处理WebSocket升级请求
+
+broadcastMessage(message: string)
+作用：向所有客户端广播消息
+
+handleWebSocketOpen(websocket: WebSocket)
+作用：处理WebSocket连接打开事件，添加客户端到列表
+
+handleWebSocketMessage(websocket: WebSocket, message: Message)
+作用：处理WebSocket消息事件，记录并广播消息
+
+handleWebSocketError(websocket: WebSocket)
+作用：处理WebSocket错误事件
+
+handleWebSocketClose(websocket: WebSocket)
+作用：处理WebSocket关闭事件，从列表移除客户端
+
+websocketHandler(websocket: WebSocket, event: WebSocketEvent, message: Message)
+作用：WebSocket事件分发器，根据事件类型调用对应处理函数
+
+createRouter(): Router
+作用：创建HTTP路由配置
+
+isPortAvailable(port: int): bool
+作用：检查端口是否可用（默认0.0.0.0.0）
+
+isPortAvailable(port: int, bindAddress: string = "0.0.0.0.0"): bool
+作用：检查指定地址的端口是否可用
+
+findAvailablePort(startPort: int): int
+作用：在默认地址上查找可用端口（5001-5100范围）
+
+findAvailablePort(startPort: int, bindAddress: string = "0.0.0.0.0"): int
+作用：在指定地址上查找可用端口
+
+logServerInfo(port: int, networkInterface: NetworkInterface)
+作用：记录服务器启动信息（新版本，显示真实IP地址）
+
+startServer*(networkInterface: NetworkInterface, serverConfig: ServerConfig)
+作用：启动WebSocket服务器，支持自定义网络接口和服务器配置

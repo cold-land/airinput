@@ -1,0 +1,27 @@
+========================================
+network.nim - 函数列表
+========================================
+
+NetworkInterface*(name: string, ipAddresses: seq[string], isLoopback: bool)
+作用：网络接口对象，存储接口名称、IP地址和回环状态
+
+getDefaultNetworkInterface*(): NetworkInterface
+作用：获取默认网络接口，优先获取真实本地IP，回退到0.0.0.0
+
+getNetworkInterfaces*(): seq[NetworkInterface]
+作用：获取所有网络接口列表（简化实现，只包含默认接口）
+
+filterInterfaces*(interfaces: seq[NetworkInterface]): seq[NetworkInterface]
+作用：过滤网络接口，排除回环、无效IP和本地链路地址
+
+displayNetworkInterfaces*(interfaces: seq[NetworkInterface])
+作用：显示网络接口列表供用户选择
+
+letUserSelectInterface*(interfaces: seq[NetworkInterface]): NetworkInterface
+作用：交互式选择网络接口，支持重试机制
+
+checkNetworkConfiguration*(): NetworkInterface
+作用：检查网络配置（交互模式），自动或用户选择接口
+
+resolveNetworkConfiguration*(daemonMode: bool, config: AirInputConfig): NetworkInterface
+作用：解析网络配置，支持守护进程和交互模式

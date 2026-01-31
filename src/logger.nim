@@ -1,4 +1,5 @@
 import std/logging, std/times, std/strformat, std/os
+import config
 
 # 获取跨平台日志目录
 proc getLogDir(): string =
@@ -13,16 +14,23 @@ proc getLogDir(): string =
   createDir(result)
 
 # 初始化日志系统
-proc initLogger*(debugMode: bool = false, daemonMode: bool = false) =
+proc initLogger*(debugMode: bool = false, daemonMode: bool = false, loggingConfig: LoggingConfig = nil) =
+  let useConfig = loggingConfig != nil
+  
   if daemonMode:
     # 守护进程模式：日志写入文件
-    let logDir = getLogDir()
-    let logFile = logDir / "airinput.log"
+    let logFile = if useConfig and loggingConfig.logFile != "": 
+                     loggingConfig.logFile 
+                   else: 
+                     getLogDir() / "airinput.log"
     
     var fileLogger = newFileLogger(
       logFile,
       fmtStr = "[$datetime:$levelid]",
-      levelThreshold = if debugMode: lvlDebug else: lvlInfo
+      levelThreshold = if debugMode or (useConfig and loggingConfig.logLevel == "debug"): lvlDebug 
+                      elif useConfig and loggingConfig.logLevel == "warn": lvlWarn
+                      elif useConfig and loggingConfig.logLevel == "error": lvlError
+                      else: lvlInfo
     )
     addHandler(fileLogger)
   else:
@@ -30,7 +38,16 @@ proc initLogger*(debugMode: bool = false, daemonMode: bool = false) =
     var consoleLogger = newConsoleLogger(fmtStr = "[$datetime:$levelid]")
     addHandler(consoleLogger)
   
-  setLogFilter(if debugMode: lvlDebug else: lvlInfo)
+  let logLevel = if debugMode: lvlDebug
+                elif useConfig:
+                  case loggingConfig.logLevel:
+                  of "debug": lvlDebug
+                  of "warn": lvlWarn
+                  of "error": lvlError
+                  else: lvlInfo
+                else: lvlInfo
+  
+  setLogFilter(logLevel)
 
 # 信息流向日志
 # 格式: [日期T时间:级别][来源]→[目标]内容

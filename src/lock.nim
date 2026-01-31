@@ -74,65 +74,60 @@ proc killProcess(pid: Pid, graceful: bool = true): bool =
   
   return not isProcessAlive(pid)
 
-# 获取持有锁文件的进程 PID
-proc getLockHolderPid(): Pid =
-  try:
-    let lockFile = getLockFilePath()
-    # 获取锁文件的 inode
-    var fileStat: Stat
-    if stat(lockFile.cstring, fileStat) != 0:
-      return 0
-    
-    let lockInode = fileStat.st_ino
-    
-    # 读取 /proc/locks
-    if not fileExists("/proc/locks"):
-      return 0
-    
-    let locksContent = readFile("/proc/locks")
-    for line in locksContent.splitLines():
-      # /proc/locks 格式示例：
-      # 1: POSIX  ADVISORY  READ  pid:12345  08:02:123456 0 EOF
-      # 2: flock  ADVISORY  WRITE pid:12345  08:02:123456 0 EOF
-      # 3: FLOCK  ADVISORY  WRITE 12345  00:2b:66730 0 EOF
-      if "flock" in line.toLowerAscii() and "ADVISORY" in line:
-        let parts = line.splitWhitespace()
-        if parts.len >= 5:
-          # 查找 pid:xxxxx 部分 或直接的 PID
-          var pidStr = ""
-          for part in parts:
-            if part.startsWith("pid:"):
-              pidStr = part[4..^1]
-              break
-          
-          # 如果没有找到 pid: 格式，尝试直接解析 PID
-          if pidStr == "":
-            # 在 /proc/locks 中，PID 通常在第五个位置
-            # 格式: 162: FLOCK  ADVISORY  WRITE 907323 00:2b:66730 0 EOF
-            # parts = ["162:", "FLOCK", "ADVISORY", "WRITE", "907323", "00:2b:66730", "0", "EOF"]
-            if parts.len >= 5:
-              let possiblePid = parts[4]
-              try:
-                let _ = parseInt(possiblePid)
-                pidStr = possiblePid
-              except:
-                discard
-          
-          if pidStr != "":
-            let pid = parseInt(pidStr)
-            
-            # 验证这个进程是否确实持有我们的锁文件
-            # 检查 /proc/PID/fd 中的文件描述符
-            let fdDir = "/proc/" & $pid & "/fd"
-            if dirExists(fdDir):
-              for fdFile in walkDir(fdDir):
-                var fdStat: Stat
-                if stat(fdFile.path.cstring, fdStat) == 0:
-                  if fdStat.st_ino == lockInode:
-                    return pid.Pid
+# 获取锁文件的 inode 号码
+proc getLockFileInode(lockFile: string): uint =
+  var fileStat: Stat
+  if stat(lockFile.cstring, fileStat) != 0:
     return 0
+  return fileStat.st_ino
+
+# 从单行锁信息中提取 PID
+proc extractPidFromLockLine(line: string): int =
+  let parts = line.splitWhitespace()
+  if parts.len < 5:
+    return 0
+  
+  # 查找 pid:xxxxx 格式
+  for part in parts:
+    if part.startsWith("pid:"):
+      try:
+        return parseInt(part[4..^1])
+      except:
+        discard
+  
+  # 尝试直接解析第五个位置的 PID
+  try:
+    let possiblePid = parts[4]
+    discard parseInt(possiblePid)  # 验证是否为数字
+    return parseInt(possiblePid)
   except:
     return 0
+
+# 从 /proc/locks 中解析所有可能的 PID
+proc parsePidsFromProcLocks(): seq[int] =
+  result = @[]
+  if not fileExists("/proc/locks"):
+    return result
+  
+  let locksContent = readFile("/proc/locks")
+  for line in locksContent.splitLines():
+    if "flock" in line.toLowerAscii() and "ADVISORY" in line:
+      let pid = extractPidFromLockLine(line)
+      if pid > 0:
+        result.add(pid)
+
+# 验证指定 PID 是否持有锁文件
+proc isPidHoldingLockFile(pid: int, lockInode: uint): bool =
+  let fdDir = "/proc/" & $pid & "/fd"
+  if not dirExists(fdDir):
+    return false
+  
+  for fdFile in walkDir(fdDir):
+    var fdStat: Stat
+    if stat(fdFile.path.cstring, fdStat) == 0:
+      if fdStat.st_ino == lockInode:
+        return true
+  return false
 
 # 清理锁
 proc cleanupLock() {.noconv.} =
@@ -142,83 +137,118 @@ proc cleanupLock() {.noconv.} =
     lockFd = -1
   quit(0)
 
-# 确保单实例运行
-proc ensureSingleInstance*(): bool =
-  let lockFile = getLockFilePath()
+# 获取持有锁文件的进程 PID
+proc getLockHolderPid(): Pid =
+  try:
+    let lockFile = getLockFilePath()
+    let lockInode = getLockFileInode(lockFile)
+    if lockInode == 0:
+      return 0
+    
+    let pids = parsePidsFromProcLocks()
+    for pid in pids:
+      if isPidHoldingLockFile(pid, lockInode):
+        return pid.Pid
+    return 0
+  except:
+    return 0
+
+# 显示菜单并获取用户选择
+proc getUserChoice(): string =
+  echo "请选择操作："
+  echo "  1. 杀旧启新 - 终止旧实例并启动新实例"
+  echo "  2. 保旧退出 - 保留旧实例，退出当前启动"
+  echo "  3. 结束全部 - 终止旧实例并退出当前启动"
+  stdout.write("请输入选项 (1/2/3): ")
+  return stdin.readLine().strip()
+
+# 保旧退出
+proc exitCleanly(): bool =
+  echo "程序退出"
+  discard close(lockFd)
+  lockFd = -1
+  return false
+
+# 结束全部
+proc killAllAndExit(lockFile: string): bool =
+  let oldPid = getLockHolderPid()
+  if oldPid > 0:
+    echo "正在终止旧实例 (PID: " & $oldPid & ")..."
+    if killProcess(oldPid, graceful = true):
+      echo "旧实例已终止"
+    else:
+      echo "警告：终止旧实例失败"
+  else:
+    echo "警告：无法找到旧实例的 PID"
   
-  # 打开锁文件（如果不存在则创建）
+  echo "程序退出"
+  discard close(lockFd)
+  lockFd = -1
+  return false
+
+# 无效选择退出
+proc exitWithInvalidChoice(): bool =
+  echo "无效选项，程序退出"
+  discard close(lockFd)
+  lockFd = -1
+  return false
+
+# 等待锁文件释放
+proc waitForLockRelease(maxAttempts: int = 10, interval: int = 200): bool =
+  for i in 0..<maxAttempts:
+    sleep(interval)
+    if getLockHolderPid() == 0:
+      return true
+  return false
+
+# 重新尝试获取锁
+proc retryAcquireLock(lockFile: string): bool =
+  discard close(lockFd)
+  lockFd = open(lockFile.cstring, O_RDWR or O_CREAT, 0o600)
+  if lockFd >= 0 and flock(lockFd, LOCK_EX or LOCK_NB) == 0:
+    setControlCHook(cleanupLock)
+    return true
+  return false
+
+# 执行"杀旧启新"逻辑
+proc killOldAndStartNew(lockFile: string): bool =
+  let oldPid = getLockHolderPid()
+  if oldPid > 0 and killProcess(oldPid, graceful = true):
+    echo "旧实例已终止"
+    if waitForLockRelease() and retryAcquireLock(lockFile):
+      echo "新实例已启动"
+      return true
+  echo "错误：无法终止旧实例或获取锁"
+  return false
+
+# 处理锁被占用的情况
+proc handleLockConflict(lockFile: string): bool =
+  echo "检测到已有 AirInput 实例在运行"
+  let choice = getUserChoice()
+  
+  case choice:
+  of "1": return killOldAndStartNew(lockFile)
+  of "2": return exitCleanly()
+  of "3": return killAllAndExit(lockFile)
+  else: return exitWithInvalidChoice()
+
+# 尝试获取文件锁
+proc tryAcquireLock(lockFile: string): bool =
   lockFd = open(lockFile.cstring, O_RDWR or O_CREAT, 0o600)
   if lockFd < 0:
     echo "无法创建锁文件: " & lockFile
     return false
   
-  # 尝试获取排他锁（非阻塞）
   if flock(lockFd, LOCK_EX or LOCK_NB) == 0:
-    # 成功获取锁，程序可以运行
-    # 注册 Ctrl+C 处理，确保退出时清理锁
     setControlCHook(cleanupLock)
     return true
-  else:
-    # 锁已被占用，说明有其他实例在运行
-    echo "检测到已有 AirInput 实例在运行"
-    echo "请选择操作："
-    echo "  1. 杀旧启新 - 终止旧实例并启动新实例"
-    echo "  2. 保旧退出 - 保留旧实例，退出当前启动"
-    echo "  3. 结束全部 - 终止旧实例并退出当前启动"
-    stdout.write("请输入选项 (1/2/3): ")
-    
-    let answer = stdin.readLine().strip()
-    
-    if answer == "1":
-      # 杀旧启新：终止持有锁的进程
-      let oldPid = getLockHolderPid()
-      if oldPid > 0:
-        echo "正在终止旧实例 (PID: " & $oldPid & ")..."
-        if killProcess(oldPid, graceful = true):
-          echo "旧实例已终止"
-          # 等待锁文件被释放
-          for i in 0..<10:
-            sleep(200)
-            let currentPid = getLockHolderPid()
-            if currentPid == 0:
-              break
-          # 关闭当前文件描述符，重新打开
-          discard close(lockFd)
-          lockFd = open(lockFile.cstring, O_RDWR or O_CREAT, 0o600)
-          if lockFd >= 0:
-            # 重新尝试获取锁
-            if flock(lockFd, LOCK_EX or LOCK_NB) == 0:
-              setControlCHook(cleanupLock)
-              echo "新实例已启动"
-              return true
-      
-      echo "错误：无法终止旧实例或获取锁"
-      return false
-    elif answer == "2":
-      # 保旧退出
-      echo "程序退出"
-      discard close(lockFd)
-      lockFd = -1
-      return false
-    elif answer == "3":
-      # 两个都结束：终止旧实例并退出当前启动
-      let oldPid = getLockHolderPid()
-      if oldPid > 0:
-        echo "正在终止旧实例 (PID: " & $oldPid & ")..."
-        if killProcess(oldPid, graceful = true):
-          echo "旧实例已终止"
-        else:
-          echo "警告：终止旧实例失败"
-      else:
-        echo "警告：无法找到旧实例的 PID"
-      
-      echo "程序退出"
-      discard close(lockFd)
-      lockFd = -1
-      return false
-    else:
-      # 无效输入
-      echo "无效选项，程序退出"
-      discard close(lockFd)
-      lockFd = -1
-      return false
+  return false
+
+# 确保单实例运行
+proc ensureSingleInstance*(): bool =
+  let lockFile = getLockFilePath()
+  
+  if tryAcquireLock(lockFile):
+    return true
+  
+  return handleLockConflict(lockFile)

@@ -1,0 +1,66 @@
+========================================
+lock.nim - 函数列表
+========================================
+
+flock(fd: cint, operation: cint): cint
+作用：文件锁定系统调用（从sys/file.h导入）
+
+daemonize*(): bool
+作用：将程序转换为守护进程，使用双重fork技术
+
+isProcessAlive(pid: Pid): bool
+作用：检查指定PID的进程是否存活
+
+killProcess(pid: Pid, graceful: bool = true): bool
+作用：终止指定PID的进程，支持优雅关闭和强制终止
+
+getLockFilePath(): string
+作用：获取跨平台锁文件路径
+
+getLockFileInode(lockFile: string): uint
+作用：获取锁文件的inode号码
+
+extractPidFromLockLine(line: string): int
+作用：从单行锁信息中提取PID
+
+parsePidsFromProcLocks(): seq[int]
+作用：从/proc/locks中解析所有可能的PID
+
+isPidHoldingLockFile(pid: int, lockInode: uint): bool
+作用：验证指定PID是否持有锁文件
+
+getLockHolderPid(): Pid
+作用：获取持有锁文件的进程PID
+
+cleanupLock()
+作用：清理锁文件并退出程序
+
+getUserChoice(): string
+作用：显示菜单并获取用户选择
+
+exitCleanly(): bool
+作用：保旧退出（保留旧实例，退出当前启动）
+
+killAllAndExit(lockFile: string): bool
+作用：结束全部（终止旧实例并退出当前启动）
+
+exitWithInvalidChoice(): bool
+作用：无效选择退出（用户输入无效选项）
+
+waitForLockRelease(maxAttempts: int = 10, interval: int = 200): bool
+作用：等待锁文件释放
+
+retryAcquireLock(lockFile: string): bool
+作用：重新尝试获取锁
+
+killOldAndStartNew(lockFile: string): bool
+作用：执行"杀旧启新"逻辑
+
+handleLockConflict(lockFile: string): bool
+作用：处理锁被占用的情况，包括用户交互和进程管理
+
+tryAcquireLock(lockFile: string): bool
+作用：尝试获取文件锁
+
+ensureSingleInstance*(): bool
+作用：确保程序单实例运行，包含锁获取和冲突处理

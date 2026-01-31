@@ -3,18 +3,40 @@ AirInput - 实时文本同步工具
 
 描述：
   AirInput 是一个实时文本同步工具，支持从移动设备到 PC 的文本传输，
-  并提供多用户支持功能。
+  并提供多用户支持功能。支持网络接口自动检测和配置文件管理。
 
 用法：
   airinput [选项]
 
 选项：
-  --version    显示版本信息并退出
-  --help       显示此帮助信息并退出
+  --version                    显示版本信息并退出
+  --help                       显示此帮助信息并退出
+  --debug                      启用调试模式（详细日志输出）
+  -D                          启用守护进程模式
+  --config-file <path>         指定配置文件路径
+  --generate-config [path]     生成默认配置文件到指定路径（默认：./airinput.conf）
+  --check-config               检查配置文件有效性
+  --show-config                显示当前配置信息
+  --list-interfaces            列出所有可用网络接口
 
 示例：
   airinput --version
   airinput --help
+  airinput --debug
+  airinput -D
+  airinput --config-file /etc/airinput.conf
+  airinput --generate-config
+  airinput --generate-config /path/to/config.conf
+  airinput --check-config
+  airinput --show-config
+  airinput --list-interfaces
+
+配置文件格式：
+  程序支持键值对格式的配置文件，示例：
+  network.bindAddress=192.168.1.100
+  network.bindPort=5001
+  server.maxConnections=100
+  logging.logLevel=INFO
 
 更多信息：
   项目主页：https://github.com/cold-land/airinput
