@@ -80,7 +80,7 @@ proc getLockHolderPid(): Pid =
     let lockFile = getLockFilePath()
     # 获取锁文件的 inode
     var fileStat: Stat
-    if stat(lockFile, fileStat) != 0:
+    if stat(lockFile.cstring, fileStat) != 0:
       return 0
     
     let lockInode = fileStat.st_ino
@@ -127,7 +127,7 @@ proc getLockHolderPid(): Pid =
             if dirExists(fdDir):
               for fdFile in walkDir(fdDir):
                 var fdStat: Stat
-                if stat(fdFile.path, fdStat) == 0:
+                if stat(fdFile.path.cstring, fdStat) == 0:
                   if fdStat.st_ino == lockInode:
                     return pid.Pid
     return 0
@@ -147,7 +147,7 @@ proc ensureSingleInstance*(): bool =
   let lockFile = getLockFilePath()
   
   # 打开锁文件（如果不存在则创建）
-  lockFd = open(lockFile, O_RDWR or O_CREAT, 0o600)
+  lockFd = open(lockFile.cstring, O_RDWR or O_CREAT, 0o600)
   if lockFd < 0:
     echo "无法创建锁文件: " & lockFile
     return false
@@ -184,7 +184,7 @@ proc ensureSingleInstance*(): bool =
               break
           # 关闭当前文件描述符，重新打开
           discard close(lockFd)
-          lockFd = open(lockFile, O_RDWR or O_CREAT, 0o600)
+          lockFd = open(lockFile.cstring, O_RDWR or O_CREAT, 0o600)
           if lockFd >= 0:
             # 重新尝试获取锁
             if flock(lockFd, LOCK_EX or LOCK_NB) == 0:

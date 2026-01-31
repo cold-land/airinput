@@ -33,7 +33,7 @@ proc initLogger*(debugMode: bool = false, daemonMode: bool = false) =
   setLogFilter(if debugMode: lvlDebug else: lvlInfo)
 
 # 信息流向日志
-# 格式: [时间:级别][来源]→[目标]内容
+# 格式: [日期T时间:级别][来源]→[目标]内容
 proc logFlow*(level: string, source: string, target: string, content: string) =
   let timeStr = now().format("yyyy-MM-dd'T'HH:mm:ss")
   let logLine = &"[{timeStr}:{level}][{source}]→[{target}]{content}"

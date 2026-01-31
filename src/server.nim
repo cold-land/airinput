@@ -1,4 +1,5 @@
-import mummy, mummy/routers, std/logging, std/times, std/net, std/os, std/locks, std/sets
+import mummy, mummy/routers, std/logging, std/times, std/net, std/locks, std/sets
+import logger
 
 # WebSocket 服务器模块
 
@@ -41,20 +42,25 @@ proc websocketHandler(
 ) =
   case event:
   of OpenEvent:
-    echo "WebSocket connected"
+    logging.info("WebSocket connected")
+    logFlow("I", "Server", "Client", "WebSocket 连接建立")
     {.gcsafe.}:
       withLock clientsLock:
         clients.incl(websocket)
   of MessageEvent:
-    echo "Message received"
+    logging.info("Message received")
+    logFlow("I", "Client", "Server", "收到消息: " & message.data)
     {.gcsafe.}:
       withLock clientsLock:
         for client in clients:
           client.send(message.data)
+    logFlow("I", "Server", "All", "广播消息: " & message.data)
   of ErrorEvent:
-    discard
+    logging.error("WebSocket error")
+    logFlow("E", "Client", "Server", "WebSocket 错误")
   of CloseEvent:
-    echo "WebSocket disconnected"
+    logging.info("WebSocket disconnected")
+    logFlow("I", "Client", "Server", "WebSocket 连接断开")
     {.gcsafe.}:
       withLock clientsLock:
         clients.excl(websocket)
@@ -77,15 +83,15 @@ proc startServer*(startPort: int = 5001) =
       actualPort = port
       break
     except:
-      echo "Port " & $port & " is busy, trying next..."
+      logging.warn("Port " & $port & " is busy, trying next...")
       continue
 
   if actualPort == -1:
-    echo "Cannot find available port"
+    logging.error("Cannot find available port")
     quit(1)
 
-  echo "Server started on port " & $actualPort
-  echo "Mobile: http://localhost:" & $actualPort & "/"
-  echo "PC: http://localhost:" & $actualPort & "/pc"
-  echo "WebSocket: ws://localhost:" & $actualPort & "/ws"
+  logging.info("Server started on port " & $actualPort)
+  logging.info("Mobile: http://localhost:" & $actualPort & "/")
+  logging.info("PC: http://localhost:" & $actualPort & "/pc")
+  logging.info("WebSocket: ws://localhost:" & $actualPort & "/ws")
   server.serve(Port(actualPort))
